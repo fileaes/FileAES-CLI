@@ -1,0 +1,11 @@
+|---| 1.0.0 |---|
+
+- Initial 'public' release
+
+|---| 1.1.0 |---|
+
+- Added support to change Compression Mode and Level
+- Added support to get Compression Mode of encrypted files
+- Added support to get FileAES-CLI version
+- Replaced obsolete automatic FAES_File encrypt/decrypt method
+- Fixed minor spelling mistake
