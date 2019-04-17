@@ -31,6 +31,9 @@ namespace FileAES_CLI
         private static uint _csBuffer = FileAES_Utilities.GetCryptoStreamBuffer();
         private static List<string> _strippedArgs = new List<string>();
 
+        private const bool _isDevBuild = true;
+        private const string _devBuildTag = "DEV_190417-1";
+
         static void Main(string[] args)
         {
             for (int i = 0; i < args.Length; i++)
@@ -410,8 +413,13 @@ namespace FileAES_CLI
 
         public static string GetVersion()
         {
+            #pragma warning disable CS0162 //Unreachable code detected
             string[] ver = (typeof(FileAES_CLI.Program).Assembly.GetCustomAttribute<AssemblyFileVersionAttribute>().Version).Split('.');
-            return "v" + ver[0] + "." + ver[1] + "." + ver[2];
+            if (_isDevBuild)
+                return "v" + ver[0] + "." + ver[1] + "." + ver[2] + "-" + _devBuildTag;
+            else
+                return "v" + ver[0] + "." + ver[1] + "." + ver[2];
+            #pragma warning restore CS0162 //Unreachable code detected
         }
     }
 }
