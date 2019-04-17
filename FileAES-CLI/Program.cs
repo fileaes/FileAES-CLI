@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using FAES;
 using FAES.Packaging;
 
@@ -21,11 +19,13 @@ namespace FileAES_CLI
         private static bool _getEncryptCompression = false;
         private static bool _getFaesVersion = false;
         private static bool _getVersion = false;
+        private static bool _showProgress = false;
         private static string _directory = null;
         private static string _passwordHint = null;
         private static string _password;
         private static string _compressionMethod = null;
         private static int _compressionLevel = 7;
+        private static ushort _progressSleep = 5000;
         private static List<string> _strippedArgs = new List<string>();
 
         static void Main(string[] args)
@@ -37,9 +37,7 @@ namespace FileAES_CLI
                 if (Directory.Exists(args[i])) _directory = args[i];
                 else if (File.Exists(args[i])) _directory = args[i];
 
-                if (strippedArg[0] == '-') strippedArg = strippedArg.Replace("-", string.Empty);
-                else if (strippedArg[0] == '/') strippedArg = strippedArg.Replace("/", string.Empty);
-                else if (strippedArg[0] == '\\') strippedArg = strippedArg.Replace("\\", string.Empty);
+                strippedArg = strippedArg.TrimStart('-', '/', '\\');
 
                 if (strippedArg == "verbose" || strippedArg == "v") _verbose = true;
                 else if (String.IsNullOrEmpty(_password) && (strippedArg == "password" || strippedArg == "p") && !string.IsNullOrEmpty(args[i + 1])) _password = args[i + 1];
@@ -49,6 +47,11 @@ namespace FileAES_CLI
                 else if (strippedArg == "gethint" || strippedArg == "getpasswordhint") _getHint = true;
                 else if (strippedArg == "gettimestamp" || strippedArg == "timestamp" || strippedArg == "encryptiondate") _getEncryptTimestamp = true;
                 else if (strippedArg == "getcompression" || strippedArg == "getcompressionmethod") _getEncryptCompression = true;
+                else if (strippedArg == "showprogress" || strippedArg == "progress" || strippedArg == "prog")
+                {
+                    if (!string.IsNullOrEmpty(args[i + 1]) && UInt16.TryParse(args[i + 1], out _progressSleep)) { }
+                    _showProgress = true;
+                }
                 else if (strippedArg == "faesversion" || strippedArg == "faes" || strippedArg == "faesver") _getFaesVersion = true;
                 else if (strippedArg == "faescliversion" || strippedArg == "faescliver" || strippedArg == "faescli" || strippedArg == "cliver" || strippedArg == "ver")
                 {
@@ -78,7 +81,8 @@ namespace FileAES_CLI
                     "\n'--level <0-9>' or '-l <0-9>': Sets the compression level that will be used to encrypt the file/folder. (Only works for with the ZIP compression method)" +
                     ".\n'--getHint': Gets the password hint for the encrypted file.\n'--getTimestamp': Gets the encryption timestamp of the encrypted file." +
                     "\n'--getCompression': Gets the compression method of the encrypted file.\n'--ver': Gets the current version of FileAES-CLI and FAES being used." +
-                    "\n'--FAES': Gets the current version of FAES being used.\n\n" +
+                    "\n'--FAES': Gets the current version of FAES being used." +
+                    "\n'--progress <Polling Rate (ms)>': Outputs the current encryption/decryption progress to the console after desired time (Leaving polling rate blank defaults to 5000ms).\n\n" +
                     "File/Folder names can be entered as a launch parameter to select what to encrypt/decrypt (also allows for dragging/dropping a file/folder on the .exe).\n\n" +
                     "Example: 'FileAES-CLI.exe File.txt -p password123'");
                 return;
@@ -267,29 +271,76 @@ namespace FileAES_CLI
                                 }
                             }
 
-                            if (encrypt.encryptFile())
+                            Thread eThread = new Thread(() =>
                             {
-                                Console.WriteLine("Encryption on {0} succeeded!", faesFile.getFaesType().ToLower());
-                            }
-                            else
+                                if (encrypt.encryptFile())
+                                {
+                                    if (_showProgress) Console.WriteLine("Progress: 100%");
+                                    Console.WriteLine("Encryption on {0} succeeded!", faesFile.getFaesType().ToLower());
+                                }
+                                else
+                                {
+                                    Console.WriteLine("Encryption on {0} failed!", faesFile.getFaesType().ToLower());
+                                }
+                            });
+
+                            Thread progressThread = new Thread(() =>
                             {
-                                Console.WriteLine("Encryption on {0} failed!", faesFile.getFaesType().ToLower());
-                            }
+                                while (_showProgress)
+                                {
+                                    ushort percentComplete = Convert.ToUInt16(encrypt.GetEncryptionPercentComplete());
+
+                                    Console.WriteLine("Progress: {0}%", percentComplete);
+                                    Thread.Sleep(_progressSleep);
+                                }
+                            });
+
+                            if (_showProgress) progressThread.Start();
+                            eThread.Start();
+
+                            while (eThread.ThreadState == ThreadState.Running)
+                            { }
+
+                            progressThread.Abort();
                         }
                         else
                         {
                             FileAES_Decrypt decrypt = new FileAES_Decrypt(faesFile, _password);
 
-                            if (decrypt.decryptFile())
+                            Thread dThread = new Thread(() =>
                             {
-                                Console.WriteLine("Decryption on {0} succeeded!", faesFile.getFaesType().ToLower());
-                            }
-                            else
+                                if (decrypt.decryptFile())
+                                {
+                                    if (_showProgress) Console.WriteLine("Progress: 100%");
+                                    Console.WriteLine("Decryption on {0} succeeded!", faesFile.getFaesType().ToLower());
+                                }
+                                else
+                                {
+                                    Console.WriteLine("Decryption on {0} failed!", faesFile.getFaesType().ToLower());
+                                    Console.WriteLine("Ensure that you entered the correct password!");
+                                    Console.WriteLine("Password Hint: {0}", faesFile.getPasswordHint());
+                                }
+                            });
+
+                            Thread progressThread = new Thread(() =>
                             {
-                                Console.WriteLine("Decryption on {0} failed!", faesFile.getFaesType().ToLower());
-                                Console.WriteLine("Ensure that you entered the correct password!");
-                                Console.WriteLine("Password Hint: {0}", faesFile.getPasswordHint());
-                            }
+                                Console.WriteLine("Progress: 0%");
+                                while (_showProgress)
+                                {
+                                    ushort percentComplete = Convert.ToUInt16(decrypt.GetDecryptionPercentComplete());
+
+                                    Console.WriteLine("Progress: {0}%", percentComplete);
+                                    Thread.Sleep(_progressSleep);
+                                }
+                            });
+
+                            if (_showProgress) progressThread.Start();
+                            dThread.Start();
+
+                            while (dThread.ThreadState == ThreadState.Running)
+                            { }
+
+                            progressThread.Abort();
                         }
                     }
                 }
@@ -299,14 +350,16 @@ namespace FileAES_CLI
                         Console.WriteLine(FileAES_Utilities.FAES_ExceptionHandling(e));
                     else
                     {
-                        Console.WriteLine("Verbose Mode: Showing Full Exception...");
+                        Console.WriteLine("Verbose Mode: Showing Full Exception...\n");
                         Console.WriteLine(e.ToString());
+                        Console.WriteLine("\n\nConsole held open. Press any key to exit.");
+                        Console.ReadKey();
                     }
                 }
             }
         }
 
-        public static string passwordInput()
+        internal static string passwordInput()
         {
             ConsoleKeyInfo inf;
             StringBuilder input = new StringBuilder();

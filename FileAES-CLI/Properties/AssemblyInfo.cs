@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("mullak99")]
 [assembly: AssemblyProduct("FileAES-CLI")]
-[assembly: AssemblyCopyright("Copyright © 2018 | mullak99")]
+[assembly: AssemblyCopyright("Copyright © 2019 | mullak99")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
