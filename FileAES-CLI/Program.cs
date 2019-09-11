@@ -131,7 +131,7 @@ namespace FileAES_CLI
             {
                 if (File.Exists(_directory) && FileAES_Utilities.isFileDecryptable(_directory))
                 {
-                    int timestamp = FileAES_Utilities.GetEncryptionTimeStamp(_directory);
+                    long timestamp = FileAES_Utilities.GetEncryptionTimeStamp(_directory);
 
                     if (timestamp >= 0)
                     {
