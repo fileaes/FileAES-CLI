@@ -32,7 +32,7 @@ namespace FileAES_CLI
         private static List<string> _strippedArgs = new List<string>();
 
         private const bool _isDevBuild = true;
-        private const string _devBuildTag = "DEV_190419-1";
+        private const string _devBuildTag = "DEV_190911-1";
 
         static void Main(string[] args)
         {
