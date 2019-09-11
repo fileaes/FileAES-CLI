@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using FAES;
+using FAES.AES;
 using FAES.Packaging;
 
 namespace FileAES_CLI
@@ -22,6 +23,7 @@ namespace FileAES_CLI
         private static bool _showProgress = false;
         private static bool _overwriteDuplicates = false;
         private static bool _deleteOriginalFile = true;
+        private static bool _showAllMetadata = false;
         private static string _directory = null;
         private static string _passwordHint = null;
         private static string _password;
@@ -32,7 +34,7 @@ namespace FileAES_CLI
         private static List<string> _strippedArgs = new List<string>();
 
         private const bool _isDevBuild = true;
-        private const string _devBuildTag = "DEV_190911-1";
+        private const string _devBuildTag = "DEV_190911-2";
 
         static void Main(string[] args)
         {
@@ -69,6 +71,7 @@ namespace FileAES_CLI
                 else if (strippedArg == "buffer" || strippedArg == "cryptostreambuffer" || strippedArg == "csbuffer" && !string.IsNullOrEmpty(args[i + 1])) UInt32.TryParse(args[i + 1], out _csBuffer);
                 else if (strippedArg == "overwrite" || strippedArg == "overwriteduplicates" || strippedArg == "o") _overwriteDuplicates = true;
                 else if (strippedArg == "preserveoriginal" || strippedArg == "original" || strippedArg == "po") _deleteOriginalFile = false;
+                else if (strippedArg == "showallmetadata" || strippedArg == "showmetadata" || strippedArg == "metadata") _showAllMetadata = true;
 
                 _strippedArgs.Add(strippedArg);
             }
@@ -162,6 +165,28 @@ namespace FileAES_CLI
                         Console.WriteLine("The Compression Mode used for '{0}' is: {1}", Path.GetFileName(_directory), compressionMode);
                     else
                         Console.WriteLine("The Compression Mode used for '{0}' is: LGYZIP (LEGACYZIP)", Path.GetFileName(_directory));
+
+                    if (String.IsNullOrEmpty(_password)) return;
+                }
+                else
+                {
+                    Console.WriteLine("You have not specified a valid encrypted file!");
+                    return;
+                }
+            }
+
+            if (_showAllMetadata)
+            {
+                if (File.Exists(_directory) && FileAES_Utilities.isFileDecryptable(_directory))
+                {
+                    string compressionMode = FileAES_Utilities.GetCompressionMode(_directory);
+
+                    MetaData faesMetaData = new MetaData(_directory);
+
+                    if (faesMetaData.IsLegacyVersion())
+                        Console.WriteLine("The raw metadata for '{0}' is (FAESv2):\n{1}", Path.GetFileName(_directory), BitConverter.ToString(faesMetaData.GetMetaData()));
+                    else
+                        Console.WriteLine("The raw metadata for '{0}' is (FAESv3):\n{1}", Path.GetFileName(_directory), BitConverter.ToString(faesMetaData.GetMetaData()));
 
                     if (String.IsNullOrEmpty(_password)) return;
                 }
