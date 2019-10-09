@@ -24,6 +24,7 @@ namespace FileAES_CLI
         private static bool _overwriteDuplicates = false;
         private static bool _deleteOriginalFile = true;
         private static bool _showAllMetadata = false;
+        private static bool _showAllMetadataString = false;
         private static string _directory = null;
         private static string _passwordHint = null;
         private static string _password;
@@ -34,7 +35,7 @@ namespace FileAES_CLI
         private static List<string> _strippedArgs = new List<string>();
 
         private const bool _isDevBuild = true;
-        private const string _devBuildTag = "BETA_1";
+        private const string _devBuildTag = "BETA_2";
 
         static void Main(string[] args)
         {
@@ -72,6 +73,7 @@ namespace FileAES_CLI
                 else if (strippedArg == "overwrite" || strippedArg == "overwriteduplicates" || strippedArg == "o") _overwriteDuplicates = true;
                 else if (strippedArg == "preserveoriginal" || strippedArg == "original" || strippedArg == "po") _deleteOriginalFile = false;
                 else if (strippedArg == "showallmetadata" || strippedArg == "showmetadata" || strippedArg == "metadata") _showAllMetadata = true;
+                else if (strippedArg == "showallutf8metadata" || strippedArg == "showutf8metadata" || strippedArg == "utf8metadata") _showAllMetadataString = true;
 
                 _strippedArgs.Add(strippedArg);
             }
@@ -87,7 +89,8 @@ namespace FileAES_CLI
                     "\n'--FAES': Gets the current version of FAES being used.\n'--overwrite' or '-o': Overwrites any duplicate files found within the FAES process." +
                     "\n'--original' or '-po': Preserves the original file used in the encrypt/decrypt process." +
                     "\n'--progress <Polling Rate (ms)>': Outputs the current encryption/decryption progress to the console after desired time (Leaving polling rate blank defaults to 5000ms)." +
-                    "\n'--buffer <Size (bytes)>': Sets the size of the FAES CryptoStream buffer.\n\n" +
+                    "\n'--buffer <Size (bytes)>': Sets the size of the FAES CryptoStream buffer.\n'--metadata': Shows the raw metadeta (Hex) of the encrypted file." +
+                    "\n'--utf8metadata': Shows the raw metadeta (Decoded UTF8) of the encrypted file.\n\n" +
                     "File/Folder names can be entered as a launch parameter to select what to encrypt/decrypt (also allows for dragging/dropping a file/folder on the .exe).\n\n" +
                     "Example: 'FileAES-CLI.exe File.txt -p password123'");
                 return;
@@ -184,9 +187,31 @@ namespace FileAES_CLI
                     MetaData faesMetaData = new MetaData(_directory);
 
                     if (faesMetaData.IsLegacyVersion())
-                        Console.WriteLine("The raw metadata for '{0}' is (FAESv2):\n{1}", Path.GetFileName(_directory), BitConverter.ToString(faesMetaData.GetMetaData()));
+                        Console.WriteLine("The metadata (bytes) for '{0}' is (FAESv2):\n{1}", Path.GetFileName(_directory), BitConverter.ToString(faesMetaData.GetMetaData()));
                     else
-                        Console.WriteLine("The raw metadata for '{0}' is (FAESv3):\n{1}", Path.GetFileName(_directory), BitConverter.ToString(faesMetaData.GetMetaData()));
+                        Console.WriteLine("The metadata (bytes) for '{0}' is (FAESv3):\n{1}", Path.GetFileName(_directory), BitConverter.ToString(faesMetaData.GetMetaData()));
+
+                    if (String.IsNullOrEmpty(_password)) return;
+                }
+                else
+                {
+                    Console.WriteLine("You have not specified a valid encrypted file!");
+                    return;
+                }
+            }
+
+            if (_showAllMetadataString)
+            {
+                if (File.Exists(_directory) && FileAES_Utilities.isFileDecryptable(_directory))
+                {
+                    string compressionMode = FileAES_Utilities.GetCompressionMode(_directory);
+
+                    MetaData faesMetaData = new MetaData(_directory);
+
+                    if (faesMetaData.IsLegacyVersion())
+                        Console.WriteLine("The metadata (string) for '{0}' is (FAESv2):\n{1}", Path.GetFileName(_directory), Encoding.UTF8.GetString(faesMetaData.GetMetaData()));
+                    else
+                        Console.WriteLine("The metadata (string) for '{0}' is (FAESv3):\n{1}", Path.GetFileName(_directory), Encoding.UTF8.GetString(faesMetaData.GetMetaData()));
 
                     if (String.IsNullOrEmpty(_password)) return;
                 }
