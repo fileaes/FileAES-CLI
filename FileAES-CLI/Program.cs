@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Threading;
@@ -12,6 +13,8 @@ namespace FileAES_CLI
 {
     class Program
     {
+        private static Update _update;
+
         private static bool _verbose = false;
         private static bool _purgeTemp = false;
         private static bool _help = false;
@@ -34,11 +37,22 @@ namespace FileAES_CLI
         private static uint _csBuffer = FileAES_Utilities.GetCryptoStreamBuffer();
         private static List<string> _strippedArgs = new List<string>();
 
+        private static bool _checkForUpdate = true;
+        private static bool _doUpdate = false;
+        private static bool _forceUpdate = false;
+        private static bool _showLatestVer = false;
+        private static string _showLatestBranch = "unknown";
+        private static string _updateBranch = "unknown";
+        private static string _updateToVer = "latest";
+
         private const bool _isDevBuild = true;
-        private const string _devBuildTag = "BETA_2";
+        private const bool _isBetaBuild = false;
+        private const string _devBuildTag = "v1.1.0-DEV191010-1";
 
         static void Main(string[] args)
         {
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+
             for (int i = 0; i < args.Length; i++)
             {
                 string strippedArg = args[i].ToLower();
@@ -48,7 +62,11 @@ namespace FileAES_CLI
 
                 strippedArg = strippedArg.TrimStart('-', '/', '\\');
 
-                if (strippedArg == "verbose" || strippedArg == "v") _verbose = true;
+                if (strippedArg == "verbose" || strippedArg == "v")
+                {
+                    _verbose = true;
+                    FileAES_Utilities.SetVerboseLogging(_verbose);
+                }
                 else if (String.IsNullOrEmpty(_password) && (strippedArg == "password" || strippedArg == "p") && !string.IsNullOrEmpty(args[i + 1])) _password = args[i + 1];
                 else if (strippedArg == "purgetemp" || strippedArg == "deletetemp") _purgeTemp = true;
                 else if (strippedArg == "help") _help = true;
@@ -62,7 +80,7 @@ namespace FileAES_CLI
                     _showProgress = true;
                 }
                 else if (strippedArg == "faesversion" || strippedArg == "faes" || strippedArg == "faesver") _getFaesVersion = true;
-                else if (strippedArg == "faescliversion" || strippedArg == "faescliver" || strippedArg == "faescli" || strippedArg == "cliver" || strippedArg == "ver")
+                else if (strippedArg == "faescliversion" || strippedArg == "faescliver" || strippedArg == "faescli" || strippedArg == "cliver" || strippedArg == "ver" || strippedArg == "version")
                 {
                     _getVersion = true;
                     _getFaesVersion = true;
@@ -74,13 +92,102 @@ namespace FileAES_CLI
                 else if (strippedArg == "preserveoriginal" || strippedArg == "original" || strippedArg == "po") _deleteOriginalFile = false;
                 else if (strippedArg == "showallmetadata" || strippedArg == "showmetadata" || strippedArg == "metadata") _showAllMetadata = true;
                 else if (strippedArg == "showallutf8metadata" || strippedArg == "showutf8metadata" || strippedArg == "utf8metadata") _showAllMetadataString = true;
+                else if (strippedArg == "showlatest" || strippedArg == "getlatest" || strippedArg == "getlatestversion" || strippedArg == "latestversion" || strippedArg == "latest")
+                {
+                    _showLatestVer = true;
+
+                    if (args.Length > (i + 1) && !string.IsNullOrEmpty(args[i + 1]))
+                    {
+                        string arg = args[i + 1];
+
+                        if (arg.ToLower() == "dev" || arg.ToLower() == "developer" || arg.ToLower() == "d")
+                        {
+                            _showLatestBranch = "dev";
+                        }
+                        else if (arg.ToLower() == "beta" || arg.ToLower() == "b")
+                        {
+                            _showLatestBranch = "beta";
+                        }
+                        else if (arg.ToLower() == "stable" || arg.ToLower() == "s" || arg.ToLower() == "release" || arg.ToLower() == "r")
+                        {
+                            _showLatestBranch = "stable";
+                        }
+                    }
+                }
+                else if (strippedArg == "noupdatecheck" || strippedArg == "nocheck" || strippedArg == "offline" || strippedArg == "noupdate") _checkForUpdate = false;
+                else if (strippedArg == "update" || strippedArg == "u")
+                {
+                    string branch = "";
+                    string version = "";
+
+                    if (args.Length > (i + 1) && !string.IsNullOrEmpty(args[i + 1]))
+                    {
+                        string arg = args[i + 1];
+
+                        {
+                        BranchFinder:
+                            if (arg.ToLower() == "dev" || arg.ToLower() == "developer" || arg.ToLower() == "d")
+                            {
+                                branch = "dev";
+                            }
+                            else if (arg.ToLower() == "beta" || arg.ToLower() == "b")
+                            {
+                                branch = "beta";
+                            }
+                            else if (arg.ToLower() == "stable" || arg.ToLower() == "s" || arg.ToLower() == "release" || arg.ToLower() == "r")
+                            {
+                                branch = "stable";
+                            }
+                            else if (args.Length > (i + 2) && !string.IsNullOrEmpty(args[i + 2]) && String.IsNullOrWhiteSpace(version))
+                            {
+                                version = args[i + 1];
+                                arg = args[i + 2];
+                                goto BranchFinder;
+                            }
+                        }
+                        
+                        if (string.IsNullOrEmpty(branch) && string.IsNullOrEmpty(version) && args.Length > (i + 1) && !string.IsNullOrEmpty(args[i + 1]))
+                        {
+                            version = args[i + 1];
+                        }
+                    }
+
+                    if (args.Length > (i + 1) && string.IsNullOrEmpty(args[i + 1]) && args[i + 1].ToLower() == "force") _forceUpdate = true;
+                    else if (args.Length > (i + 2) && string.IsNullOrEmpty(args[i + 2]) && args[i + 2].ToLower() == "force") _forceUpdate = true;
+                    else if (args.Length > (i + 3) && string.IsNullOrEmpty(args[i + 3]) && args[i + 3].ToLower() == "force") _forceUpdate = true;
+
+                    if (!String.IsNullOrWhiteSpace(branch)) _updateBranch = branch;
+                    if (!String.IsNullOrWhiteSpace(version)) _updateToVer = version;
+
+                    _doUpdate = true;
+                }
 
                 _strippedArgs.Add(strippedArg);
             }
 
+            if (_checkForUpdate)
+            {
+                if (_updateBranch == "unknown")
+                {
+                    if (IsDevBuild())
+                        _updateBranch = "dev";
+                    else if (IsBetaBuild())
+                        _updateBranch = "beta";
+                    else
+                        _updateBranch = "stable";
+                }
+
+                _update = new Update("dev");
+            }
+
+            if (_showLatestBranch == "unknown")
+            {
+                _showLatestBranch = _updateBranch;
+            }
+
             if (_help)
             {
-                Console.WriteLine("A FAES-based tool for encrypting and decrypting files using the command-line.\n\nPossible Launch Parameters:\n'--verbose' or '-v': Show more debugging information in the console (WIP)." +
+                Logging.Log("A FAES-based tool for encrypting and decrypting files using the command-line.\n\nPossible Launch Parameters:\n'--verbose' or '-v': Show more debugging information in the console (WIP)." +
                     "\n'--purgeTemp' or '-p': Purge the FileAES Temp folder to resolve possible errors.\n'--password <password>' or '-p <password>': Sets the password that will be used to encrypt/decrypt the file/folder." +
                     "\n'--hint <Password Hint>' or '-h <Password Hint>': Sets a password hint.\n'--compression <ZIP/TAR/LZMA/LEGACYZIP>' or '-c <ZIP/TAR/LZMA/LEGACYZIP>': Sets the compression method that will be used to encrypt the file/folder." +
                     "\n'--level <0-9>' or '-l <0-9>': Sets the compression level that will be used to encrypt the file/folder. (Only works for with the ZIP compression method)" +
@@ -88,12 +195,53 @@ namespace FileAES_CLI
                     "\n'--getCompression': Gets the compression method of the encrypted file.\n'--ver': Gets the current version of FileAES-CLI and FAES being used." +
                     "\n'--FAES': Gets the current version of FAES being used.\n'--overwrite' or '-o': Overwrites any duplicate files found within the FAES process." +
                     "\n'--original' or '-po': Preserves the original file used in the encrypt/decrypt process." +
-                    "\n'--progress <Polling Rate (ms)>': Outputs the current encryption/decryption progress to the console after desired time (Leaving polling rate blank defaults to 5000ms)." +
+                    "\n'--progress [<Polling Rate (ms)>]': Outputs the current encryption/decryption progress to the console after desired time (Leaving polling rate blank defaults to 5000ms)." +
                     "\n'--buffer <Size (bytes)>': Sets the size of the FAES CryptoStream buffer.\n'--metadata': Shows the raw metadeta (Hex) of the encrypted file." +
-                    "\n'--utf8metadata': Shows the raw metadeta (Decoded UTF8) of the encrypted file.\n\n" +
+                    "\n'--utf8metadata': Shows the raw metadeta (Decoded UTF8) of the encrypted file.\n'--offline': Disables auto-update checking." +
+                    "\n'--latest [<branch>]': Outputs the latest version of FileAES-CLI on that branch (Leaving branch blank defaults to current builds branch)." +
+                    "\n'--update [<version>] [<branch>] [force]': Updates FileAES-CLI as specified. Using no arguments updates to the latest version on the current branch.\n\n" +
                     "File/Folder names can be entered as a launch parameter to select what to encrypt/decrypt (also allows for dragging/dropping a file/folder on the .exe).\n\n" +
                     "Example: 'FileAES-CLI.exe File.txt -p password123'");
                 return;
+            }
+
+            if (_doUpdate)
+            {
+                if (_update != null && _checkForUpdate)
+                {
+                    _update.CheckForUpdateNonThreadded(true);
+
+                    bool doUpdate = false;
+
+                    if ((!_forceUpdate && _update.IsUpdate()) || _forceUpdate || _updateToVer != "latest")
+                    {
+                        if (_updateToVer == "latest")
+                        {
+                            string latestVer = _update.GetLatestVersion();
+                            Logging.Log(String.Format("Installing FileAES-CLI {0}...", latestVer));
+                            doUpdate = true;
+                        }
+                        else if (_update.DoesVersionExist(_updateToVer, "dev"))
+                        {
+                            Logging.Log(String.Format("Installing FileAES-CLI {0}...", _updateToVer));
+                            doUpdate = true;
+                        }
+                        else
+                        {
+                            Logging.Log(String.Format("Could not find FileAES-CLI {0}!", _updateToVer), Severity.WARN);
+                        }
+
+                        if (doUpdate)
+                        {
+                            _update.UpdateSelf(true, _updateToVer);
+                            return;
+                        }
+                    }
+                }
+            }
+            else if (_checkForUpdate)
+            {
+                _update.CheckForUpdate();
             }
 
             if (_purgeTemp)
@@ -103,13 +251,35 @@ namespace FileAES_CLI
 
             if (_getVersion)
             {
-                Console.WriteLine("Current FileAES-CLI Version: {0}", GetVersion());
+                Logging.Log(String.Format("Current FileAES-CLI Version: {0}", GetVersion()));
                 if (!_getFaesVersion) return;
             }
 
             if (_getFaesVersion)
             {
-                Console.WriteLine("Current FAES Version: {0}", FileAES_Utilities.GetVersion());
+                Logging.Log(String.Format("Current FAES Version: {0}", FileAES_Utilities.GetVersion()));
+                return;
+            }
+
+            if (_showLatestVer)
+            {
+                if (_checkForUpdate)
+                {
+                    _update.SetBranch(_showLatestBranch);
+
+                    string latestVer = _update.GetLatestVersion();
+
+                    if (latestVer != "v0.0.0")
+                        Logging.Log(String.Format("The latest FileAES-CLI version on branch '{0}' is: {1}", _showLatestBranch.ToUpper(), latestVer));
+                    else
+                        Logging.Log("The latest FileAES-CLI version could not be found! Please check your internet connection.", Severity.WARN);
+
+                    _update.SetBranch(_updateBranch);
+                }
+                    
+                else
+                    Logging.Log("The latest version cannot be displayed when the program is in offline mode!");
+
                 return;
             }
 
@@ -120,20 +290,20 @@ namespace FileAES_CLI
                     string passHint = FileAES_Utilities.GetPasswordHint(_directory);
 
                     if (passHint != "No Password Hint Set")
-                        Console.WriteLine("The hint for '{0}' is: {1}", Path.GetFileName(_directory), passHint);
+                        Logging.Log(String.Format("The hint for '{0}' is: {1}", Path.GetFileName(_directory), passHint));
                     else
-                        Console.WriteLine("'{0}' does not contain a password hint!", Path.GetFileName(_directory));
+                        Logging.Log(String.Format("'{0}' does not contain a password hint!", Path.GetFileName(_directory)));
 
                     if (String.IsNullOrEmpty(_password) && (!_getEncryptTimestamp || !_getEncryptCompression)) return;
                 }
                 else
                 {
-                    Console.WriteLine("You have not specified a valid encrypted file!");
+                    Logging.Log("You have not specified a valid encrypted file!", Severity.WARN);
                     return;
                 }
             }
 
-            if(_getEncryptTimestamp)
+            if (_getEncryptTimestamp)
             {
                 if (File.Exists(_directory) && FileAES_Utilities.isFileDecryptable(_directory))
                 {
@@ -142,18 +312,18 @@ namespace FileAES_CLI
                     if (timestamp >= 0)
                     {
                         DateTime dateTime = FileAES_Utilities.UnixTimeStampToDateTime((double)timestamp);
-                        Console.WriteLine("'{0}' was encrypted on {1} at {2}.", Path.GetFileName(_directory), dateTime.ToString("dd/MM/yyyy"), dateTime.ToString("HH:mm:ss tt"));
+                        Logging.Log(String.Format("'{0}' was encrypted on {1} at {2}.", Path.GetFileName(_directory), dateTime.ToString("dd/MM/yyyy"), dateTime.ToString("HH:mm:ss tt")));
                     }
                     else
                     {
-                        Console.WriteLine("This file does not contain a encryption date. This is likely due to this file being encrypted using an older FAES version.");
+                        Logging.Log("This file does not contain a encryption date. This is likely due to this file being encrypted using an older FAES version.");
                     }
 
                     if (String.IsNullOrEmpty(_password) && !_getEncryptCompression) return;
                 }
                 else
                 {
-                    Console.WriteLine("You have not specified a valid encrypted file!");
+                    Logging.Log("You have not specified a valid encrypted file!", Severity.WARN);
                     return;
                 }
             }
@@ -165,15 +335,15 @@ namespace FileAES_CLI
                     string compressionMode = FileAES_Utilities.GetCompressionMode(_directory);
 
                     if (compressionMode != "LGYZIP")
-                        Console.WriteLine("The Compression Mode used for '{0}' is: {1}", Path.GetFileName(_directory), compressionMode);
+                        Logging.Log(String.Format("The Compression Mode used for '{0}' is: {1}", Path.GetFileName(_directory), compressionMode));
                     else
-                        Console.WriteLine("The Compression Mode used for '{0}' is: LGYZIP (LEGACYZIP)", Path.GetFileName(_directory));
+                        Logging.Log(String.Format("The Compression Mode used for '{0}' is: LGYZIP (LEGACYZIP)", Path.GetFileName(_directory)));
 
                     if (String.IsNullOrEmpty(_password)) return;
                 }
                 else
                 {
-                    Console.WriteLine("You have not specified a valid encrypted file!");
+                    Logging.Log("You have not specified a valid encrypted file!", Severity.WARN);
                     return;
                 }
             }
@@ -187,15 +357,15 @@ namespace FileAES_CLI
                     MetaData faesMetaData = new MetaData(_directory);
 
                     if (faesMetaData.IsLegacyVersion())
-                        Console.WriteLine("The metadata (bytes) for '{0}' is (FAESv2):\n{1}", Path.GetFileName(_directory), BitConverter.ToString(faesMetaData.GetMetaData()));
+                        Logging.Log(String.Format("The metadata (bytes) for '{0}' is (FAESv2):\n{1}", Path.GetFileName(_directory), BitConverter.ToString(faesMetaData.GetMetaData())));
                     else
-                        Console.WriteLine("The metadata (bytes) for '{0}' is (FAESv3):\n{1}", Path.GetFileName(_directory), BitConverter.ToString(faesMetaData.GetMetaData()));
+                        Logging.Log(String.Format("The metadata (bytes) for '{0}' is (FAESv3):\n{1}", Path.GetFileName(_directory), BitConverter.ToString(faesMetaData.GetMetaData())));
 
                     if (String.IsNullOrEmpty(_password)) return;
                 }
                 else
                 {
-                    Console.WriteLine("You have not specified a valid encrypted file!");
+                    Logging.Log("You have not specified a valid encrypted file!", Severity.WARN);
                     return;
                 }
             }
@@ -209,15 +379,15 @@ namespace FileAES_CLI
                     MetaData faesMetaData = new MetaData(_directory);
 
                     if (faesMetaData.IsLegacyVersion())
-                        Console.WriteLine("The metadata (string) for '{0}' is (FAESv2):\n{1}", Path.GetFileName(_directory), Encoding.UTF8.GetString(faesMetaData.GetMetaData()));
+                        Logging.Log(String.Format("The metadata (string) for '{0}' is (FAESv2):\n{1}", Path.GetFileName(_directory), Encoding.UTF8.GetString(faesMetaData.GetMetaData())));
                     else
-                        Console.WriteLine("The metadata (string) for '{0}' is (FAESv3):\n{1}", Path.GetFileName(_directory), Encoding.UTF8.GetString(faesMetaData.GetMetaData()));
+                        Logging.Log(String.Format("The metadata (string) for '{0}' is (FAESv3):\n{1}", Path.GetFileName(_directory), Encoding.UTF8.GetString(faesMetaData.GetMetaData())));
 
                     if (String.IsNullOrEmpty(_password)) return;
                 }
                 else
                 {
-                    Console.WriteLine("You have not specified a valid encrypted file!");
+                    Logging.Log("You have not specified a valid encrypted file!", Severity.WARN);
                     return;
                 }
             }
@@ -233,7 +403,7 @@ namespace FileAES_CLI
                     {
                         break;
                     }
-                    Console.WriteLine("You have not specified a valid file or folder!");
+                    Logging.Log("You have not specified a valid file or folder!", Severity.WARN);
                 }
             }
             if (String.IsNullOrEmpty(_password))
@@ -255,7 +425,7 @@ namespace FileAES_CLI
                             _password = password;
                             break;
                         }
-                        Console.WriteLine("Passwords do not match!");
+                        Logging.Log("Passwords do not match!");
                     }
                     else
                     {
@@ -268,28 +438,27 @@ namespace FileAES_CLI
 
             if (!File.Exists(_directory) && !Directory.Exists(_directory))
             {
-                Console.WriteLine("You have not specified a valid file or folder!");
+                Logging.Log("You have not specified a valid file or folder!", Severity.WARN);
             }
             else if (String.IsNullOrEmpty(_password))
             {
-                Console.WriteLine("Please specify a password!");
+                Logging.Log("Please specify a password!", Severity.WARN);
             }
             else
             {
                 FAES_File faesFile = new FAES_File(_directory);
-                FileAES_Utilities.SetVerboseLogging(_verbose);
                 FileAES_Utilities.SetCryptoStreamBuffer(_csBuffer);
 
                 try
                 {
                     if (_compressionLevel < 0 || _compressionLevel > 9)
                     {
-                        Console.WriteLine("You have not specified a valid compression level! Please choose a value between 0 and 9.");
+                        Logging.Log("You have not specified a valid compression level! Please choose a value between 0 and 9.", Severity.WARN);
                         return;
                     }
                     else
                     {
-                        if (_verbose) Console.WriteLine("[DEBUG] CryptoStream Buffer Size: {0} bytes", FileAES_Utilities.GetCryptoStreamBuffer());
+                        if (_verbose) Logging.Log(String.Format("CryptoStream Buffer Size: {0} bytes", FileAES_Utilities.GetCryptoStreamBuffer()), Severity.DEBUG);
 
                         if (faesFile.isFileEncryptable())
                         {
@@ -322,7 +491,7 @@ namespace FileAES_CLI
                                             break;
                                         }
                                     default:
-                                        Console.WriteLine("Unknown Compression Method: {0}", _compressionMethod);
+                                        Logging.Log(String.Format("Unknown Compression Method: {0}", _compressionMethod), Severity.ERROR);
                                         return;
                                 }
                             }
@@ -332,8 +501,7 @@ namespace FileAES_CLI
                                 while (_showProgress)
                                 {
                                     ushort percentComplete = Convert.ToUInt16(encrypt.GetEncryptionPercentComplete());
-                                    if (_verbose) Console.WriteLine("[INFO] Progress: {0}%", percentComplete);
-                                    else Console.WriteLine("Progress: {0}%", percentComplete);
+                                    Logging.Log(String.Format("Progress: {0}%", percentComplete));
                                     Thread.Sleep(_progressSleep);
                                 }
                             });
@@ -346,15 +514,14 @@ namespace FileAES_CLI
                                     {
                                         if (_showProgress)
                                         {
-                                            if (_verbose) Console.WriteLine("[INFO] Progress: 100%");
-                                            else Console.WriteLine("Progress: 100%");
+                                            Logging.Log("Progress: 100%");
                                         }
 
-                                        Console.WriteLine("Encryption on {0} succeeded!", faesFile.getFaesType().ToLower());
+                                        Logging.Log(String.Format("Encryption on {0} succeeded!", faesFile.getFaesType().ToLower()));
                                     }
                                     else
                                     {
-                                        Console.WriteLine("Encryption on {0} failed!", faesFile.getFaesType().ToLower());
+                                        Logging.Log(String.Format("Encryption on {0} failed!", faesFile.getFaesType().ToLower()));
                                     }
                                 }
                                 catch (Exception e)
@@ -382,8 +549,7 @@ namespace FileAES_CLI
                                 {
                                     ushort percentComplete = Convert.ToUInt16(decrypt.GetDecryptionPercentComplete());
 
-                                    if (_verbose) Console.WriteLine("[INFO] Progress: {0}%", percentComplete);
-                                    else Console.WriteLine("Progress: {0}%", percentComplete);
+                                    Logging.Log(String.Format("Progress: {0}%", percentComplete));
                                     Thread.Sleep(_progressSleep);
                                 }
                             });
@@ -396,17 +562,16 @@ namespace FileAES_CLI
                                     {
                                         if (_showProgress)
                                         {
-                                            if (_verbose) Console.WriteLine("[INFO] Progress: 100%");
-                                            else Console.WriteLine("Progress: 100%");
+                                            Logging.Log("Progress: 100%");
                                         }
 
-                                        Console.WriteLine("Decryption on {0} succeeded!", faesFile.getFaesType().ToLower());
+                                        Logging.Log(String.Format("Decryption on {0} succeeded!", faesFile.getFaesType().ToLower()));
                                     }
                                     else
                                     {
-                                        Console.WriteLine("Decryption on {0} failed!", faesFile.getFaesType().ToLower());
-                                        Console.WriteLine("Ensure that you entered the correct password!");
-                                        Console.WriteLine("Password Hint: {0}", faesFile.GetPasswordHint());
+                                        Logging.Log(String.Format("Decryption on {0} failed!", faesFile.getFaesType().ToLower()));
+                                        Logging.Log("Ensure that you entered the correct password!");
+                                        Logging.Log(String.Format("Password Hint: {0}", faesFile.GetPasswordHint()));
                                     }
                                 }
                                 catch (Exception e)
@@ -436,12 +601,10 @@ namespace FileAES_CLI
         internal static void HandleException(Exception e)
         {
             if (!_verbose)
-                Console.WriteLine(FileAES_Utilities.FAES_ExceptionHandling(e));
+                Logging.Log(FileAES_Utilities.FAES_ExceptionHandling(e), Severity.ERROR);
             else
             {
-                Console.WriteLine("[ERROR] Verbose Mode Enabled: Showing Full Exception...\n");
-                Console.WriteLine(e.ToString());
-                Console.WriteLine("\n\nConsole held open. Press any key to exit.");
+                Logging.Log(String.Format("Verbose Mode Enabled: Showing Full Exception...\n{0}\n\nConsole held open. Press any key to exit.", e.ToString()), Severity.ERROR);
                 Console.ReadKey();
             }
         }
@@ -465,11 +628,31 @@ namespace FileAES_CLI
         {
             #pragma warning disable CS0162 //Unreachable code detected
             string[] ver = (typeof(FileAES_CLI.Program).Assembly.GetCustomAttribute<AssemblyFileVersionAttribute>().Version).Split('.');
-            if (_isDevBuild)
+            if (_isDevBuild || _isBetaBuild)
                 return "v" + ver[0] + "." + ver[1] + "." + ver[2] + "-" + _devBuildTag;
             else
                 return "v" + ver[0] + "." + ver[1] + "." + ver[2];
             #pragma warning restore CS0162 //Unreachable code detected
+        }
+
+        public static bool IsVerbose()
+        {
+            return _verbose;
+        }
+
+        public static bool IsDevBuild()
+        {
+            return _isDevBuild;
+        }
+
+        public static bool IsBetaBuild()
+        {
+            return _isBetaBuild;
+        }
+
+        public static bool IsReleaseBuild()
+        {
+            return !(_isDevBuild || _isBetaBuild);
         }
     }
 }
