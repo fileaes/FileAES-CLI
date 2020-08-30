@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "FileAES-CLI": {
+      "commandName": "Project",
+      "commandLineArgs": "Test.txt -p pass"
+    }
+  }
+}

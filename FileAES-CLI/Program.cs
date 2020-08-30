@@ -47,7 +47,7 @@ namespace FileAES_CLI
 
         private const bool _isDevBuild = true;
         private const bool _isBetaBuild = false;
-        private const string _devBuildTag = "v1.1.0-DEV191010-1";
+        private const string _devBuildTag = "BETA_3";
 
         static void Main(string[] args)
         {
@@ -526,7 +526,9 @@ namespace FileAES_CLI
                                 }
                                 catch (Exception e)
                                 {
+                                    #if NETFRAMEWORK
                                     progressThread.Abort();
+                                    #endif
                                     HandleException(e);
                                 }
                             });
@@ -536,8 +538,9 @@ namespace FileAES_CLI
 
                             while (eThread.ThreadState == ThreadState.Running)
                             { }
-
+                            #if NETFRAMEWORK
                             progressThread.Abort();
+                            #endif
                         }
                         else
                         {
@@ -576,7 +579,9 @@ namespace FileAES_CLI
                                 }
                                 catch (Exception e)
                                 {
+                                    #if NETFRAMEWORK
                                     progressThread.Abort();
+                                    #endif
                                     HandleException(e);
                                 }
                             });
@@ -586,8 +591,9 @@ namespace FileAES_CLI
 
                             while (dThread.ThreadState == ThreadState.Running)
                             { }
-
+                            #if NETFRAMEWORK
                             progressThread.Abort();
+                            #endif
                         }
                     }
                 }

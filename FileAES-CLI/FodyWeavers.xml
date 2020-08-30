@@ -3,6 +3,7 @@
   <Costura>
     <IncludeAssemblies>
           FAES
+          SharpCompress
       </IncludeAssemblies>
   </Costura>
 </Weavers>

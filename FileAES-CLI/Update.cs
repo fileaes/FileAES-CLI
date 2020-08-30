@@ -217,7 +217,12 @@ namespace FileAES_CLI
                 }
                 catch (UnauthorizedAccessException)
                 {
+                    #if NETFRAMEWORK
                     RunAsAdmin();
+                    #else
+                    Logging.Log(String.Format("The program needs to be ran with administrator privilages to update!"), Severity.WARN);
+                    #endif
+
                 }
                 catch (Exception e)
                 {
@@ -318,7 +323,7 @@ namespace FileAES_CLI
             Logging.Log(String.Format("ToNonFormatted: Converted '{0}' to '{1}'.", formattedVersion, nonFormattedVersion), Severity.DEBUG);
             return nonFormattedVersion;
         }
-
+        #if NETFRAMEWORK
         internal static bool IsRunAsAdmin()
         {
             WindowsIdentity id = WindowsIdentity.GetCurrent();
@@ -347,5 +352,6 @@ namespace FileAES_CLI
                 Environment.Exit(0);
             }
         }
+        #endif
     }
 }
