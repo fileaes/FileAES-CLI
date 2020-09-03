@@ -47,7 +47,7 @@ namespace FileAES_CLI
 
         private const bool _isDevBuild = true;
         private const bool _isBetaBuild = false;
-        private const string _devBuildTag = "BETA_3";
+        private const string _devBuildTag = "BETA_4";
 
         static void Main(string[] args)
         {
