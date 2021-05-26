@@ -41,13 +41,14 @@ namespace FileAES_CLI
         private static bool _doUpdate = false;
         private static bool _forceUpdate = false;
         private static bool _showLatestVer = false;
+        private static bool _useLocalEncrypt = true;
         private static string _showLatestBranch = "unknown";
         private static string _updateBranch = "unknown";
         private static string _updateToVer = "latest";
 
         private const bool _isDevBuild = true;
         private const bool _isBetaBuild = false;
-        private const string _devBuildTag = "BETA_5";
+        private const string _devBuildTag = "BETA_6";
 
         static void Main(string[] args)
         {
@@ -92,6 +93,9 @@ namespace FileAES_CLI
                 else if (strippedArg == "preserveoriginal" || strippedArg == "original" || strippedArg == "po") _deleteOriginalFile = false;
                 else if (strippedArg == "showallmetadata" || strippedArg == "showmetadata" || strippedArg == "metadata") _showAllMetadata = true;
                 else if (strippedArg == "showallutf8metadata" || strippedArg == "showutf8metadata" || strippedArg == "utf8metadata") _showAllMetadataString = true;
+                else if (strippedArg == "" || strippedArg == "showutf8metadata" || strippedArg == "utf8metadata") _showAllMetadataString = true;
+                else if (strippedArg == "tempencrypt" || strippedArg == "temp") _useLocalEncrypt = false;
+                else if (strippedArg == "localencrypt" || strippedArg == "local") _useLocalEncrypt = true;
                 else if (strippedArg == "showlatest" || strippedArg == "getlatest" || strippedArg == "getlatestversion" || strippedArg == "latestversion" || strippedArg == "latest")
                 {
                     _showLatestVer = true;
@@ -200,6 +204,8 @@ namespace FileAES_CLI
                     "\n'--utf8metadata': Shows the raw metadeta (Decoded UTF8) of the encrypted file.\n'--offline': Disables auto-update checking." +
                     "\n'--latest [<branch>]': Outputs the latest version of FileAES-CLI on that branch (Leaving branch blank defaults to current builds branch)." +
                     "\n'--update [<version>] [<branch>] [force]': Updates FileAES-CLI as specified. Using no arguments updates to the latest version on the current branch.\n\n" +
+                    "\n'--localEncrypt' or '-local': Encrypt files within the same folder as the source file (Default behaviour).\n\n" +
+                    "\n'--tempEncrypt' or '-temp': Encrypt files within the OS' Temp folder (Old behaviour).\n\n" +
                     "File/Folder names can be entered as a launch parameter to select what to encrypt/decrypt (also allows for dragging/dropping a file/folder on the .exe).\n\n" +
                     "Example: 'FileAES-CLI.exe File.txt -p password123'");
                 return;
@@ -462,6 +468,7 @@ namespace FileAES_CLI
 
                         if (faesFile.isFileEncryptable())
                         {
+                            FileAES_Utilities.LocalEncrypt = _useLocalEncrypt;
                             FileAES_Encrypt encrypt = new FileAES_Encrypt(faesFile, _password, _passwordHint, Optimise.Balanced, null, _deleteOriginalFile, _overwriteDuplicates);
 
                             if (!String.IsNullOrEmpty(_compressionMethod))
