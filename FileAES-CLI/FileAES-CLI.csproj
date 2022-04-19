@@ -5,7 +5,7 @@
 	<RuntimeIdentifiers>win-x64;linux-x64;osx-x64</RuntimeIdentifiers>
 	<PublishSingleFile>false</PublishSingleFile>
 	<PublishTrimmed>true</PublishTrimmed>
-    <TargetFrameworks>net45;net46;netcoreapp2.1;netcoreapp3.1</TargetFrameworks>
+    <TargetFrameworks>net462;net6</TargetFrameworks>
     <RootNamespace>FileAES_CLI</RootNamespace>
 	<Version>1.1.0</Version>
     <AssemblyVersion>1.1.0.0</AssemblyVersion>
@@ -22,7 +22,7 @@
     <FileVersion>1.1.0.0</FileVersion>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <RepositoryUrl>https://github.com/fileaes/FileAES-CLI</RepositoryUrl>
-    <Copyright>Copyright © 2019 | mullak99</Copyright>
+    <Copyright>Copyright © 2022 | mullak99</Copyright>
     <ApplicationIcon>Icon.ico</ApplicationIcon>
   </PropertyGroup>
 

@@ -43,12 +43,13 @@ namespace FileAES_CLI
         public string GetLatestVersion()
         {
             try
-            {string latestUrl = String.Format("https://api.mullak99.co.uk/FAES/IsUpdate.php?app=faes_cli&branch={0}&showver=true&version={1}", _branch, ConvertVersionToNonFormatted(Program.GetVersion()));
+            {
+                string latestUrl = $"https://api.mullak99.co.uk/FAES/IsUpdate.php?app=faes_cli&branch={_branch}&showver=true&version={ConvertVersionToNonFormatted(Program.GetVersion())}";
 
                 WebClient client = new WebClient();
                 byte[] html = client.DownloadData(latestUrl);
                 UTF8Encoding utf = new UTF8Encoding();
-                if (String.IsNullOrEmpty(utf.GetString(html)) || utf.GetString(html) == "null")
+                if (string.IsNullOrEmpty(utf.GetString(html)) || utf.GetString(html) == "null")
                     return "v0.0.0";
                 else
                     return utf.GetString(html);
@@ -63,13 +64,13 @@ namespace FileAES_CLI
         {
             try
             {
-                string latestUrl = String.Format("https://api.mullak99.co.uk/FAES/DoesVersionExist.php?app=faes_cli&branch={0}&version={1}", branch, version);
+                string latestUrl = $"https://api.mullak99.co.uk/FAES/DoesVersionExist.php?app=faes_cli&branch={branch}&version={version}";
 
                 WebClient client = new WebClient();
                 byte[] html = client.DownloadData(latestUrl);
                 UTF8Encoding utf = new UTF8Encoding();
                 string result = utf.GetString(html);
-                if (String.IsNullOrEmpty(result) || result == "null")
+                if (string.IsNullOrEmpty(result) || result == "null")
                     return false;
                 else if (result == "VersionExists")
                     return true;
@@ -107,11 +108,11 @@ namespace FileAES_CLI
             if (!silent)
             {
                 if (updateVersion != "v0.0.0")
-                    Logging.Log(String.Format("Latest FAES_CLI version: {0}", updateVersion), Severity.DEBUG);
+                    Logging.Log($"Latest FAES_CLI version: {updateVersion}", Severity.DEBUG);
                 else
                     Logging.Log(String.Format("Update check failed!"), Severity.WARN);
             }
-                
+
 
             _appUpdateStatus = updateInfo;
             _latestVersion = updateVersion;
@@ -120,7 +121,8 @@ namespace FileAES_CLI
             if (_appUpdateStatus == UpdateStatus.AppOutdated)
             {
                 _isUpdateAvailable = true;
-                if (!silent) Logging.Log(String.Format("[UPDATE] FileAES-CLI {0} is available! You are on {1}. Run the program with '--update' to update.", _latestVersion, Program.GetVersion()));
+                if (!silent) Logging.Log(
+                    $"[UPDATE] FileAES-CLI {_latestVersion} is available! You are on {Program.GetVersion()}. Run the program with '--update' to update.");
             }
             else _isUpdateAvailable = false;
         }
@@ -139,14 +141,14 @@ namespace FileAES_CLI
                 }
                 else if (latestVer != "v0.0.0" && CheckServerConnection())
                 {
-                    string compareVersions = String.Format("https://api.mullak99.co.uk/FAES/CompareVersions.php?app=faes_cli&branch={0}&version1={1}&version2={2}", "dev", currentVer, latestVer);
+                    string compareVersions = $"https://api.mullak99.co.uk/FAES/CompareVersions.php?app=faes_cli&branch={"dev"}&version1={currentVer}&version2={latestVer}";
 
                     WebClient client = new WebClient();
                     byte[] html = client.DownloadData(compareVersions);
                     UTF8Encoding utf = new UTF8Encoding();
                     string result = utf.GetString(html).ToLower();
 
-                    if (String.IsNullOrEmpty(result) || result == "null")
+                    if (string.IsNullOrEmpty(result) || result == "null")
                         return UpdateStatus.ServerError;
                     else if (result.Contains("not exist in the database!") || result == "version1 is newer than version2")
                         return UpdateStatus.AppNewer;
@@ -196,7 +198,7 @@ namespace FileAES_CLI
                         File.Delete(Path.Combine(installDir, "updater.pack"));
 
                     WebClient webClient = new WebClient();
-                    webClient.DownloadFile(new Uri(String.Format("https://api.mullak99.co.uk/FAES/GetDownload.php?app=faes_updater&ver=latest&branch={0}&redirect=true", _branch)), Path.Combine(installDir, "updater.pack"));
+                    webClient.DownloadFile(new Uri($"https://api.mullak99.co.uk/FAES/GetDownload.php?app=faes_updater&ver=latest&branch={_branch}&redirect=true"), Path.Combine(installDir, "updater.pack"));
                     ZipFile.ExtractToDirectory(Path.Combine(installDir, "updater.pack"), installDir);
                     File.Delete(Path.Combine(installDir, "updater.pack"));
                     Thread.Sleep(100);
@@ -256,12 +258,12 @@ namespace FileAES_CLI
                     if (versionSplit[1].ToUpper()[0] == 'B')
                     {
                         string betaTag = versionSplit[1].ToUpper().Replace("BETA", "").Replace("B", "");
-                        formattedVersion += String.Format(" (BETA {0}", betaTag.Replace(" ", ""));
+                        formattedVersion += $" (BETA {betaTag.Replace(" ", "")}";
                     }
                     else if (versionSplit[1].ToUpper()[0] == 'D')
                     {
                         string devTag = versionSplit[1].ToUpper().Replace("DEV", "").Replace("D", "");
-                        formattedVersion += String.Format(" (DEV{0}", devTag);
+                        formattedVersion += $" (DEV{devTag}";
                     }
                     if (versionSplit.Length > 2)
                     {
@@ -276,7 +278,7 @@ namespace FileAES_CLI
             }
             else formattedVersion = nonFormattedVersion;
 
-            Logging.Log(String.Format("ToFormatted: Converted '{0}' to '{1}'.", nonFormattedVersion, formattedVersion), Severity.DEBUG);
+            Logging.Log($"ToFormatted: Converted '{nonFormattedVersion}' to '{formattedVersion}'.", Severity.DEBUG);
             return formattedVersion;
         }
 
@@ -320,7 +322,7 @@ namespace FileAES_CLI
                 nonFormattedVersion = nonFormattedVersion.Replace("-DEV-", "-DEV");
             nonFormattedVersion = nonFormattedVersion.TrimEnd('-');
 
-            Logging.Log(String.Format("ToNonFormatted: Converted '{0}' to '{1}'.", formattedVersion, nonFormattedVersion), Severity.DEBUG);
+            Logging.Log($"ToNonFormatted: Converted '{formattedVersion}' to '{nonFormattedVersion}'.", Severity.DEBUG);
             return nonFormattedVersion;
         }
         #if NETFRAMEWORK
